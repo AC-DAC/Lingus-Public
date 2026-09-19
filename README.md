@@ -32,7 +32,7 @@ A secondary constraint shaped the entire architecture: the target phone runs Gra
              ▼
 ┌──────────────────────────────────┐
 │  Cloudflare Workers AI           │
-│  Whisper large-v3-turbo → STT   │
+│  Whisper large-v3-turbo → STT    │
 │  Gemma 4 → translation           │
 │  (both directions, 5-turn        │
 │  rolling context window)         │
