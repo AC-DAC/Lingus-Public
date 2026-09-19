@@ -1,6 +1,6 @@
 # Lingus — Talk now, learn as you go. (Public)
 
-Self-hosted Korean ↔ English language tool built for live video calls with Korean-speaking family and for structured study between calls. Three tabs: **Listen** (real-time KO→EN transcription), **Speak** (EN→KO composition), and **Study** (spaced curriculum built from real call data).
+Self-hosted Korean ↔ English language tool built for live calls (voice/video) with Korean-speaking family and for structured study between calls. Three tabs: **Listen** (real-time KO→EN transcription), **Speak** (EN→KO composition), and **Study** (spaced curriculum built from real call data).
 
 Production deployment: `lingus.alexchuc.au`
 
