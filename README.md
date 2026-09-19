@@ -101,6 +101,7 @@ Staged curriculum across five stages, each gating on completion before the next 
 | 2 | Past & Future Tense |
 | 3 | Negatives & Casual Speech |
 | 4 | Baby Care Vocabulary |
+| 5 | More to come ... |
 
 Curriculum content for 반말/존댓말 (casual/formal speech registers) verified by a native speaker.
 
