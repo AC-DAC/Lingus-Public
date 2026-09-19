@@ -140,7 +140,3 @@ A Korean learning curriculum built directly from conversations. Phrases heard du
 ## Stack
 
 `React` `Cloudflare Workers AI` `Whisper large-v3-turbo` `Gemma 4` `Azure Speech` `nginx` `Cloudflare Tunnel` `Cloudflare Access` `Let's Encrypt` `systemd` `Raspberry Pi`
-
----
-
-*Created by [Alex Chuc](https://www.linkedin.com/in/alexchuc/) · [alexchuc.au](https://alexchuc.au)*
