@@ -31,11 +31,11 @@ A secondary constraint shaped the entire architecture: the target phone runs Gra
              │ 2. WAV per utterance
              ▼
 ┌──────────────────────────────────┐
-│  Cloudflare Workers AI           │
-│  Whisper large-v3-turbo → STT   │
-│  Gemma 4 → translation           │
-│  (both directions, 5-turn        │
-│  rolling context window)         │
+│  Cloudflare Worker (API keys)    │
+│  Azure Speech ko-KR → STT        │
+│  Gemma 4 on Workers AI →         │
+│  translation (both directions,   │
+│  5-turn rolling context window)  │
 └────────────┬─────────────────────┘
              │ 3. static build + Pi-side persistence
              ▼
@@ -47,15 +47,15 @@ A secondary constraint shaped the entire architecture: the target phone runs Gra
 └──────────────────────────────────┘
 ```
 
-**Architecture non-negotiables:** desktop browser for live calls; phone for study. The Pi serves the static React build and the Study/Speak persistence store only — STT and translation go directly from the browser to Cloudflare Workers AI and Azure. The Pi never touches live call traffic.
+**Architecture non-negotiables:** desktop browser for live calls; phone for study. The Pi serves the static React build and the Study/Speak persistence store only — STT and translation go from the browser through a Cloudflare Worker (which holds the API keys) to Azure Speech and Workers AI. The Pi never touches live call traffic.
 
-**Azure Speech** handles TTS and pronunciation scoring in the Study tab. It is scoped there only — Workers AI handles all translation and STT for live calls.
+**Two providers, one job each:** Azure Speech handles all speech — live-call STT (ko-KR), TTS, and pronunciation scoring. Gemma 4 on Workers AI handles all translation.
 
 ---
 
 ## Listen — KO → EN
 
-Real-time Korean speech to English transcription during a live call (voice/video). Audio is captured digitally via BlackHole (no mic re-recording) and segmented by silence boundaries via AudioWorklet VAD — utterances are not cut mid-sentence regardless of pause length. Each segment is sent to Whisper large-v3-turbo with a forced `ko` language hint, then to Gemma 4 with a 5-turn rolling context window for coherent pronoun resolution across turns.
+Real-time Korean speech to English transcription during a live call (voice/video). Audio is captured digitally via BlackHole (no mic re-recording) and segmented by silence boundaries via AudioWorklet VAD — utterances are not cut mid-sentence regardless of pause length. Each segment is sent to Azure Speech (ko-KR), then to Gemma 4 with a 5-turn rolling context window for coherent pronoun resolution across turns.
 
 The live pipeline health rail shows backend connectivity, transcription and translation latency, and confidence score per utterance in real time.
 
@@ -63,16 +63,17 @@ The live pipeline health rail shows backend connectivity, transcription and tran
 
 **Key implementation decisions:**
 
-- **AudioWorklet replaced MediaRecorder.** Whisper rejects WebM outright. Fixed-interval chunking cut Korean's SOV sentences mid-utterance — because the verb comes last, cutting at four seconds loses the entire meaning. AudioWorklet with silence-boundary VAD sends one complete utterance per request.
+- **Azure Speech replaced Whisper — measured on a real call.** Whisper large-v3-turbo on Workers AI averaged 4.5s per utterance with spikes to 11.6s, caused by Workers AI queueing rather than cold starts, so warming could not fix it. On the first real 15-minute call, Azure ko-KR averaged 1.1s (0.4–1.7s). Whisper was then removed entirely, with no fallback: a silent fallback had hidden a dead Azure key for two days. An Azure error now fails loudly and turns the Transcribe row on the status rail red.
+- **AudioWorklet replaced MediaRecorder.** The original STT engine (Whisper) rejected WebM outright. Fixed-interval chunking cut Korean's SOV sentences mid-utterance — because the verb comes last, cutting at four seconds loses the entire meaning. AudioWorklet with silence-boundary VAD sends one complete utterance per request.
 - **Transcript lines ordered by capture time, not STT arrival** — prevents out-of-order display when network latency varies between concurrent requests. Each segment is timestamped at speech onset and inserted by capture time, not arrival order.
-- **Gemma 4 keep-warm heartbeat** runs every 45 seconds during live calls to minimise cold-start latency. Gemma cold-starts at 10–40s; warm it runs at ~0.5s. Whisper latency variance is Workers AI queueing — warming does not help and was tried, measured, and reverted.
+- **Gemma 4 keep-warm heartbeat** runs every 45 seconds during live calls to minimise cold-start latency. Gemma cold-starts at 10–40s; warm it runs at ~0.5s.
 - **Rolling context window (5 turns)** — stateless translators guess wrong on homophones and idioms without conversational context. Korean has many characters with multiple meanings depending on what preceded them.
 - **Gemma 4 over Llama — benchmark-driven, not assumed.** Llama introduced subject-pronoun errors on Korean under concurrent load: a sentence meaning "I feel the cold" was translated as "You feel the cold." Gemma 4 handled 8 parallel requests at 750ms with zero failures in a proper concurrent benchmark. The initial Gemma → Llama → Gemma reversion arc: Gemma queued catastrophically in July 2026 (6–78s under 8 concurrent requests) and was temporarily replaced by Llama on the live path. An August re-benchmark found the issue did not reproduce; Llama's Korean accuracy problems were the deciding factor to revert. Lesson: benchmark concurrency, not just sequential warm calls.
 - **Client-side idiom dictionary** — detects known idioms and proverbs and flags their actual meaning regardless of which STT model produced the text, even when the translation is technically correct but culturally wrong. Matches on pattern, not perfect text, so it catches STT errors on known phrases.
-- **Deterministic Korean numeral parser** — dates, times, and money amounts are computed by code, not the model. Gemma 4 produced consistent numeral errors (wrong month, wrong denomination) that a parser eliminates entirely. Whisper writes numbers as digits or words depending on context; the parser handles both. A prompt nudge to fix this was tested and failed — it is a model capability limit, not a wording problem. The rule: the LLM does language; code does the math.
-- **Live confidence flagging** — Whisper's per-segment `avg_logprob` and `no_speech_prob` are computed into a 0–1 confidence score. Lines below threshold render with an amber tint and a prompt to ask for repetition. Flags mumbled or noisy audio; does not catch fluent hallucinations.
+- **Deterministic Korean numeral parser** — dates, times, and money amounts are computed by code, not the model. Gemma 4 produced consistent numeral errors (wrong month, wrong denomination) that a parser eliminates entirely. STT writes numbers as digits or words depending on context; the parser handles both. A prompt nudge to fix this was tested and failed — it is a model capability limit, not a wording problem. The rule: the LLM does language; code does the math.
+- **Live confidence flagging** — Azure's NBest confidence drives the flag. Its scores are compressed (correct lines 0.86–0.96, badly misheard lines mostly 0.78–0.85), so the threshold was re-tuned against a noise-graded test set: at 0.85 it caught 8 of 10 bad lines and flagged no fully correct line. Lines below threshold render with an amber tint and a prompt to ask for repetition.
 - **Speaker diarization prototyped and removed** — complexity did not survive real-call validation. Pause/Unpause replaced it.
-- **Whisper prompt biasing tested and removed** — introduced echo regression.
+- **Whisper prompt biasing tested and removed** (before the Azure switch) — introduced echo regression.
 
 ---
 
@@ -159,7 +160,7 @@ Interleaved recall test across all completed stages. 12 mixed questions — reca
 - **Speaker diarization** — prototyped, rejected after real-call validation.
 - **Naver CLOVA** — Naver Cloud Platform does not support account registration from Australia.
 - **SenseVoice (Alibaba)** — self-hosted GPU model, no native streaming, Korean accuracy unproven.
-- **AWS Lambda for STT** — no GPU; Whisper on CPU with cold starts would be slower, not faster. Hardware is not the latency lever; streaming STT is.
+- **AWS Lambda for STT** — no GPU; Whisper on CPU with cold starts would be slower, not faster. Hardware was not the latency lever; the STT provider was. Streaming STT (Azure SDK) is the next step.
 
 ---
 
@@ -175,4 +176,4 @@ Interleaved recall test across all completed stages. 12 mixed questions — reca
 
 ## Stack
 
-`React` `Cloudflare Workers AI` `Whisper large-v3-turbo` `Gemma 4` `Azure Speech` `Python` `nginx` `Cloudflare Tunnel` `Cloudflare Access` `Let's Encrypt` `systemd` `Raspberry Pi`
+`React` `Cloudflare Workers AI` `Gemma 4` `Azure Speech` `Python` `nginx` `Cloudflare Tunnel` `Cloudflare Access` `Let's Encrypt` `systemd` `Raspberry Pi`
