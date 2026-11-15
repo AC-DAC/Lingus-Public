@@ -16,6 +16,10 @@ pre-commit:
       run: "echo 'Refusing to commit secret-bearing file(s): {staged_files}' && exit 1"
 pre-push:
   commands:
+    private-terms:
+      # Every commit not on GitHub yet, with its message: catches old history merged back
+      # from a stale clone, which the commit checks never see.
+      run: 'c="$HOME/.config/git/private-terms-check"; [ ! -x "$c" ] || "$c" push'
     gitleaks-history:
       run: gitleaks git --redact --no-banner --verbose
 
