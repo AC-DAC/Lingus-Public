@@ -1,3 +1,5 @@
+<img src="assets/icon.svg" width="72" alt="Lingus app icon: a speech bubble with two-way arrows">
+
 # Lingus — Talk now, learn as you go. (Public)
 
 Self-hosted Korean ↔ English language tool built for live calls (voice/video) with Korean-speaking family and for structured study between calls. Three tabs: **Listen** (real-time KO→EN transcription), **Speak** (EN→KO composition), and **Study** (staged curriculum, read-along stories and spoken practice graded on whether you were understood).
@@ -191,6 +193,7 @@ Every Korean voice line in Lingus — 268 phrase and Story lines, plus slow copi
 | Secrets | None in the browser or the Worker — Workers AI is reached through the Worker's binding |
 | nginx rate limiting | Backstop on `/transcribe` and `/translate` endpoints |
 | nginx caching | `index.html` served `no-cache` (SPA entry, always revalidated on deploy); `/assets/` served `immutable` with a 1-year TTL (content-hashed) |
+| App icon | Speech bubble with two-way arrows. Transparent SVG favicon for browser tabs; dark-tile PNGs (180/192/512) for iOS and Android home screens via a web app manifest, requested with credentials so the Cloudflare Access gate doesn't block it. PNGs rendered from the SVG with headless Chrome |
 
 **Rejected alternatives:**
 
@@ -207,6 +210,7 @@ Every Korean voice line in Lingus — 268 phrase and Story lines, plus slow copi
 - **On-device STT on the phone** — large-v3-turbo is 1.6 GB, and small browser models are worse at Korean.
 - **Published Korean Whisper fine-tunes** — scored worse than stock large-v3-turbo in the benchmark.
 - **Docker for the voice generator** — no Metal GPU access inside Docker on macOS.
+- **Waveform app icon** — the obvious mark for a speech app, but EchoVoice (the voice engine) uses a waveform. Kept the two projects visually distinct.
 
 ---
 
