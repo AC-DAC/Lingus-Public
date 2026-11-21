@@ -168,6 +168,8 @@ Say it and Story are graded on whether a listener would understand you, not on s
 
 ## Voices — EchoVoice
 
+Full write-up of the voice engine, its judge and the blind tests behind each voice: **[EchoVoice-Public](https://github.com/AC-DAC/EchoVoice-Public)**.
+
 Every Korean voice line in Lingus — 268 phrase and Story lines, plus slow copies — is pre-rendered by **EchoVoice**, a local voice engine on the Mac (Qwen3-TTS on MLX), and served as static files from the Pi.
 
 - **Why replace Azure's voices:** they sounded unnatural. In a blind listening set with Azure's voice hidden among the candidates, it was rejected on all 10 lines.
